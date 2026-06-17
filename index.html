@@ -1,0 +1,740 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CIDR subnet calculator</title>
+<meta name="description" content="Type an IPv4 CIDR like 10.0.0.0/24. See the network and broadcast address, usable host range, host count, netmask, wildcard mask, address scope, and a bit-level view of the network/host split.">
+<link rel="canonical" href="https://truffle.ghostwright.dev/public/tools/cidr/">
+<link rel="icon" type="image/png" sizes="32x32" href="/public/_assets/favicon-32.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="CIDR subnet calculator">
+<meta property="og:description" content="Type an IPv4 CIDR. See the network, broadcast, usable host range, mask, wildcard, scope, and the bit-level network/host split.">
+<meta property="og:url" content="https://truffle.ghostwright.dev/public/tools/cidr/">
+<meta name="twitter:card" content="summary">
+
+<style>
+:root {
+  --paper: #f6f1e6;
+  --paper-raised: #fbf7ec;
+  --ink: #1c1814;
+  --ink-soft: #2e2822;
+  --quiet: #6b6157;
+  --rule: #e0d6c0;
+  --rule-soft: #ebe2cf;
+  --link: #7a4f1a;
+  --accent: #a57729;
+  --accent-bright: #c39040;
+  --code-bg: #ece3cc;
+  --code-ink: #2e2822;
+  --ok: #4f7a2e;
+  --warn: #a57729;
+  --over: #a83a25;
+  --font-body: "Iowan Old Style", "Palatino Linotype", Palatino, "URW Palladio L", "Book Antiqua", Georgia, serif;
+  --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #171310;
+    --paper-raised: #1e1814;
+    --ink: #f0e9d9;
+    --ink-soft: #e0d9c6;
+    --quiet: #9c9082;
+    --rule: #2e2820;
+    --rule-soft: #26211b;
+    --link: #d4a259;
+    --accent: #d4a259;
+    --accent-bright: #e4b574;
+    --code-bg: #201a15;
+    --code-ink: #e0d9c6;
+    --ok: #95c963;
+    --warn: #d4a259;
+    --over: #e07a5f;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font: 17px/1.6 var(--font-body);
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+main {
+  max-width: 44rem;
+  padding: 2.5rem 1.5rem 4rem;
+  margin: 0 auto;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--accent);
+  margin: 0 0 0.7rem;
+}
+.eyebrow a {
+  color: var(--accent);
+  border-bottom: 1px solid color-mix(in oklab, var(--accent) 30%, transparent);
+  text-decoration: none;
+}
+
+h1 {
+  font-family: var(--font-mono);
+  font-size: clamp(1.6rem, 4vw, 2.1rem);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.5rem;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.lede {
+  font-size: 1.02rem;
+  color: var(--ink-soft);
+  margin: 0 0 2rem;
+  max-width: 36rem;
+}
+
+h2 {
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--quiet);
+  margin: 2.2rem 0 0.9rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+p { margin: 0 0 1rem; }
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in oklab, var(--link) 30%, transparent);
+}
+a:hover { border-bottom-color: var(--link); }
+
+label.field-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--quiet);
+  margin: 0 0 0.5rem;
+}
+
+#cidr {
+  width: 100%;
+  padding: 0.85rem 0.95rem;
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  line-height: 1.4;
+  background: var(--paper-raised);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  -webkit-appearance: none;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+#cidr:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+#cidr.invalid {
+  border-color: var(--over);
+  outline-color: var(--over);
+}
+
+.preset-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--quiet);
+  margin: 1.6rem 0 0;
+}
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.9rem 0 0;
+}
+.presets button {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 0.32rem 0.65rem;
+  cursor: pointer;
+  -webkit-appearance: none;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.presets button:hover { border-color: var(--accent); color: var(--accent); }
+.presets button:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.result {
+  margin: 1.6rem 0 0;
+  padding: 1.1rem 1.2rem;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+}
+
+.status {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  margin: 0 0 0.6rem;
+  font-weight: 600;
+}
+.status.ok { color: var(--ok); }
+.status.over { color: var(--over); }
+
+.summary {
+  font-family: var(--font-display);
+  font-size: 1.18rem;
+  line-height: 1.4;
+  margin: 0 0 0.6rem;
+  color: var(--ink);
+}
+.summary em { font-style: italic; color: var(--accent); }
+
+.error-detail {
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  color: var(--over);
+  margin: 0 0 0.3rem;
+  background: color-mix(in oklab, var(--over) 8%, transparent);
+  padding: 0.5rem 0.7rem;
+  border-radius: 4px;
+  border: 1px solid color-mix(in oklab, var(--over) 25%, transparent);
+}
+
+table.fields {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  margin: 0.6rem 0 0;
+}
+table.fields th, table.fields td {
+  text-align: left;
+  padding: 0.46rem 0.55rem;
+  border-bottom: 1px solid var(--rule-soft);
+  font-variant-numeric: tabular-nums;
+  vertical-align: top;
+}
+table.fields tr:last-child td { border-bottom: 0; }
+table.fields td.k { color: var(--quiet); white-space: nowrap; width: 14rem; }
+table.fields td.v { color: var(--ink); font-weight: 600; }
+table.fields td.v .sub { color: var(--quiet); font-weight: 400; font-size: 0.92em; }
+
+.scope-badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  padding: 0.16rem 0.5rem;
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--accent) 14%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent);
+}
+.scope-badge.public {
+  background: color-mix(in oklab, var(--ok) 14%, transparent);
+  color: var(--ok);
+  border-color: color-mix(in oklab, var(--ok) 30%, transparent);
+}
+
+.bits {
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  line-height: 1.7;
+  margin: 0.5rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.1rem 0.55rem;
+  font-variant-numeric: tabular-nums;
+}
+.bit-octet { display: inline-flex; gap: 0.06rem; }
+.bit { padding: 0 0.06rem; }
+.bit.net { color: var(--accent); font-weight: 600; }
+.bit.host { color: var(--quiet); }
+.bit-dot { color: var(--rule); }
+.bit-legend {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--quiet);
+  margin: 0.7rem 0 0;
+}
+.bit-legend .sw { font-weight: 600; }
+.bit-legend .net { color: var(--accent); }
+.bit-legend .host { color: var(--quiet); }
+
+.copy-bar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0 0; }
+.copy-bar button {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--ink-soft);
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  -webkit-appearance: none;
+}
+.copy-bar button:hover { border-color: var(--accent); color: var(--accent); }
+.copy-bar button:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+table.reference {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  margin: 0;
+}
+table.reference th, table.reference td {
+  text-align: left;
+  padding: 0.42rem 0.55rem;
+  border-bottom: 1px solid var(--rule-soft);
+  vertical-align: top;
+  font-variant-numeric: tabular-nums;
+}
+table.reference th {
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  color: var(--quiet);
+  font-weight: 600;
+  border-bottom: 1px solid var(--rule);
+}
+table.reference td:first-child { color: var(--accent); font-weight: 600; white-space: nowrap; }
+table.reference td:nth-child(2) { color: var(--ink-soft); }
+table.reference td:nth-child(3) { color: var(--quiet); }
+
+code, pre {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--code-bg);
+  color: var(--code-ink);
+  padding: 0.1rem 0.32rem;
+  border-radius: 3px;
+}
+
+footer.colophon {
+  margin: 4rem 0 0;
+  padding: 1.2rem 0 0;
+  border-top: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--quiet);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.4rem;
+  justify-content: space-between;
+}
+footer.colophon a {
+  color: var(--quiet);
+  border-bottom-color: color-mix(in oklab, var(--quiet) 30%, transparent);
+}
+footer.colophon a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+@media (max-width: 480px) {
+  main { padding: 1.8rem 1rem 3rem; }
+  #cidr { font-size: 0.95rem; }
+  .summary { font-size: 1.04rem; }
+  table.fields { font-size: 0.8rem; }
+  table.fields td.k { width: auto; }
+  table.reference { font-size: 0.78rem; }
+  .bits { font-size: 0.78rem; }
+}
+</style>
+</head>
+<body>
+
+<main>
+
+<p class="eyebrow"><a href="/public/tools/">/public/tools/</a></p>
+<h1>CIDR subnet calculator</h1>
+<p class="lede">Type an IPv4 address with a prefix, like <code>10.0.0.0/24</code>. See the network and broadcast addresses, the usable host range, the netmask, the wildcard mask, the address scope, and a bit-level view of where the network ends and the host begins.</p>
+
+<label class="field-label" for="cidr">CIDR</label>
+<input id="cidr" type="text" spellcheck="false" autocomplete="off" autocapitalize="off" inputmode="text" value="10.0.0.0/24" aria-describedby="status">
+
+<span class="preset-label">presets</span>
+<div class="presets" id="presets">
+  <button type="button" data-cidr="192.168.1.0/24">192.168.1.0/24</button>
+  <button type="button" data-cidr="10.0.0.0/8">10.0.0.0/8</button>
+  <button type="button" data-cidr="172.16.0.0/12">172.16.0.0/12</button>
+  <button type="button" data-cidr="10.20.30.40/26">10.20.30.40/26</button>
+  <button type="button" data-cidr="192.168.1.0/30">/30 (4 addrs)</button>
+  <button type="button" data-cidr="10.0.0.0/31">/31 (point-to-point)</button>
+  <button type="button" data-cidr="8.8.8.8/32">/32 (single host)</button>
+  <button type="button" data-cidr="100.64.0.0/10">100.64.0.0/10</button>
+  <button type="button" data-cidr="0.0.0.0/0">0.0.0.0/0</button>
+</div>
+
+<section class="result" id="result" aria-live="polite">
+  <p class="status ok" id="status">valid</p>
+  <p class="summary" id="summary"></p>
+  <div id="errorBox" hidden></div>
+
+  <table class="fields" id="fieldsTable">
+    <tbody id="fieldsBody"></tbody>
+  </table>
+
+  <div class="copy-bar" id="copyBar">
+    <button type="button" data-copy="network">copy network</button>
+    <button type="button" data-copy="range">copy host range</button>
+    <button type="button" data-copy="mask">copy netmask</button>
+  </div>
+
+  <h2 style="margin-top: 1.6rem;">Network / host bits</h2>
+  <div class="bits" id="bits" aria-hidden="true"></div>
+  <p class="bit-legend"><span class="sw net">orange</span> = network bits (fixed across the block) &middot; <span class="sw host">grey</span> = host bits (vary within the block). Shown for the network address.</p>
+</section>
+
+<h2>Prefix reference</h2>
+<table class="reference">
+  <thead>
+    <tr><th>prefix</th><th>netmask</th><th>addresses / usable hosts</th></tr>
+  </thead>
+  <tbody id="refBody"></tbody>
+</table>
+
+<h2>About</h2>
+<p>Everything is computed in your browser with 32-bit integer math: no address leaves the page, and the tool works offline after first load. A bare address with no <code>/prefix</code> is treated as <code>/32</code>.</p>
+<p>Two prefixes get special host counting. A <code>/31</code> has no separate network or broadcast address; both of its two addresses are usable hosts on a point-to-point link (<a href="https://www.rfc-editor.org/rfc/rfc3021">RFC 3021</a>). A <code>/32</code> is a single host. For every shorter prefix, the first address in the block is the network address and the last is the broadcast address, so usable hosts is total addresses minus two.</p>
+<p>Scope is classified from the network address against the IANA special-purpose registries: private (<a href="https://www.rfc-editor.org/rfc/rfc1918">RFC 1918</a>), shared/CGNAT (RFC 6598), loopback, link-local (RFC 3927), documentation (RFC 5737), multicast, and reserved ranges. Anything outside those is labelled globally routable.</p>
+<p>Source: <a href="https://github.com/truffle-dev/tool-cidr">github.com/truffle-dev/tool-cidr</a>. MIT.</p>
+
+<footer class="colophon">
+  <span><a href="https://truffle.ghostwright.dev/">truffle.ghostwright.dev</a></span>
+  <span>MIT &middot; <a href="https://github.com/truffle-dev/tool-cidr">source</a></span>
+</footer>
+
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---- parsing -----------------------------------------------------------
+  function parseOctet(s) {
+    s = s.trim();
+    if (!/^\d{1,3}$/.test(s)) return null;
+    if (s.length > 1 && s.charAt(0) === "0") return null; // no leading zeros (octal trap)
+    var n = parseInt(s, 10);
+    return n <= 255 ? n : null;
+  }
+
+  function parseCidr(input) {
+    var s = (input || "").trim();
+    if (s === "") throw new Error("enter a CIDR like 10.0.0.0/24");
+    var slash = s.indexOf("/");
+    var ipPart, prefixPart;
+    if (slash === -1) { ipPart = s; prefixPart = null; }
+    else { ipPart = s.slice(0, slash); prefixPart = s.slice(slash + 1); }
+
+    var octets = ipPart.split(".");
+    if (octets.length !== 4) {
+      throw new Error("an IPv4 address needs four dot-separated octets, got " + octets.length);
+    }
+    var ipInt = 0;
+    for (var i = 0; i < 4; i++) {
+      var o = parseOctet(octets[i]);
+      if (o === null) {
+        throw new Error("invalid octet '" + octets[i].trim() + "' (each must be 0-255, no leading zeros)");
+      }
+      ipInt = (ipInt * 256) + o;
+    }
+    ipInt = ipInt >>> 0;
+
+    var prefix, bare;
+    if (prefixPart === null) { prefix = 32; bare = true; }
+    else {
+      bare = false;
+      if (!/^\d{1,2}$/.test(prefixPart.trim())) throw new Error("prefix must be a number 0-32");
+      prefix = parseInt(prefixPart.trim(), 10);
+      if (prefix > 32) throw new Error("prefix must be 0-32, got /" + prefix);
+    }
+    return { ipInt: ipInt, prefix: prefix, bare: bare };
+  }
+
+  // ---- computation -------------------------------------------------------
+  function maskForPrefix(prefix) {
+    return prefix === 0 ? 0 : (0xFFFFFFFF << (32 - prefix)) >>> 0;
+  }
+
+  function compute(c) {
+    var prefix = c.prefix;
+    var mask = maskForPrefix(prefix);
+    var wildcard = (~mask) >>> 0;
+    var network = (c.ipInt & mask) >>> 0;
+    var broadcast = (network | wildcard) >>> 0;
+    var total = Math.pow(2, 32 - prefix);
+    var firstHost, lastHost, usable, special;
+    if (prefix === 32) {
+      firstHost = lastHost = network; usable = 1; special = "single host";
+    } else if (prefix === 31) {
+      firstHost = network; lastHost = broadcast; usable = 2; special = "point-to-point (RFC 3021)";
+    } else {
+      firstHost = (network + 1) >>> 0; lastHost = (broadcast - 1) >>> 0; usable = total - 2; special = null;
+    }
+    return {
+      prefix: prefix, mask: mask, wildcard: wildcard, network: network,
+      broadcast: broadcast, total: total, firstHost: firstHost,
+      lastHost: lastHost, usable: usable, special: special, ipInt: c.ipInt
+    };
+  }
+
+  function dotted(n) {
+    return ((n >>> 24) & 255) + "." + ((n >>> 16) & 255) + "." + ((n >>> 8) & 255) + "." + (n & 255);
+  }
+
+  // ---- scope -------------------------------------------------------------
+  var SPECIAL = [
+    { net: "0.0.0.0",        pfx: 8,  label: "current network",            rfc: "RFC 1122" },
+    { net: "10.0.0.0",       pfx: 8,  label: "private",                    rfc: "RFC 1918" },
+    { net: "100.64.0.0",     pfx: 10, label: "shared / CGNAT",             rfc: "RFC 6598" },
+    { net: "127.0.0.0",      pfx: 8,  label: "loopback",                   rfc: "RFC 1122" },
+    { net: "169.254.0.0",    pfx: 16, label: "link-local",                 rfc: "RFC 3927" },
+    { net: "172.16.0.0",     pfx: 12, label: "private",                    rfc: "RFC 1918" },
+    { net: "192.0.0.0",      pfx: 24, label: "IETF protocol assignments",  rfc: "RFC 6890" },
+    { net: "192.0.2.0",      pfx: 24, label: "documentation (TEST-NET-1)", rfc: "RFC 5737" },
+    { net: "192.88.99.0",    pfx: 24, label: "6to4 relay anycast",         rfc: "RFC 7526" },
+    { net: "192.168.0.0",    pfx: 16, label: "private",                    rfc: "RFC 1918" },
+    { net: "198.18.0.0",     pfx: 15, label: "benchmarking",               rfc: "RFC 2544" },
+    { net: "198.51.100.0",   pfx: 24, label: "documentation (TEST-NET-2)", rfc: "RFC 5737" },
+    { net: "203.0.113.0",    pfx: 24, label: "documentation (TEST-NET-3)", rfc: "RFC 5737" },
+    { net: "255.255.255.255",pfx: 32, label: "limited broadcast",          rfc: "RFC 919"  },
+    { net: "224.0.0.0",      pfx: 4,  label: "multicast",                  rfc: "RFC 5771" },
+    { net: "240.0.0.0",      pfx: 4,  label: "reserved (future use)",      rfc: "RFC 1112" }
+  ];
+  var SPECIAL_INT = SPECIAL.map(function (r) {
+    var parts = r.net.split(".");
+    var n = 0;
+    for (var i = 0; i < 4; i++) n = (n * 256) + parseInt(parts[i], 10);
+    return { netInt: n >>> 0, maskInt: maskForPrefix(r.pfx), label: r.label, rfc: r.rfc };
+  });
+
+  function scopeOf(networkInt) {
+    for (var i = 0; i < SPECIAL_INT.length; i++) {
+      var r = SPECIAL_INT[i];
+      if (((networkInt & r.maskInt) >>> 0) === r.netInt) {
+        return { label: r.label, rfc: r.rfc, isPublic: false };
+      }
+    }
+    return { label: "globally routable", rfc: null, isPublic: true };
+  }
+
+  // ---- formatting --------------------------------------------------------
+  function groupThousands(n) {
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+
+  function describe(r) {
+    var addrWord = r.total === 1 ? "address" : "addresses";
+    var hostWord = r.usable === 1 ? "usable host" : "usable hosts";
+    return "A /" + r.prefix + " block of <em>" + groupThousands(r.total) + "</em> " + addrWord +
+      ", <em>" + groupThousands(r.usable) + "</em> " + hostWord + ".";
+  }
+
+  function buildFields(r) {
+    var sc = scopeOf(r.network);
+    var rows = [];
+    rows.push(["Network address", dotted(r.network) + "/" + r.prefix]);
+    if (r.prefix <= 30) {
+      rows.push(["Usable host range", dotted(r.firstHost) + " &ndash; " + dotted(r.lastHost)]);
+      rows.push(["Broadcast address", dotted(r.broadcast)]);
+    } else if (r.prefix === 31) {
+      rows.push(["Host addresses", dotted(r.firstHost) + " &amp; " + dotted(r.lastHost) +
+        " <span class='sub'>(both usable, point-to-point)</span>"]);
+    } else {
+      rows.push(["Host address", dotted(r.network) + " <span class='sub'>(single host)</span>"]);
+    }
+    rows.push(["Total addresses", groupThousands(r.total)]);
+    rows.push(["Usable hosts", groupThousands(r.usable) + (r.special ? " <span class='sub'>(" + r.special + ")</span>" : "")]);
+    rows.push(["Netmask", dotted(r.mask) + " <span class='sub'>(/" + r.prefix + ")</span>"]);
+    rows.push(["Wildcard mask", dotted(r.wildcard)]);
+    var scopeHtml = "<span class='scope-badge" + (sc.isPublic ? " public" : "") + "'>" +
+      escapeHtml(sc.label) + "</span>" + (sc.rfc ? " <span class='sub'>" + sc.rfc + "</span>" : "");
+    rows.push(["Scope", scopeHtml]);
+    var html = "";
+    for (var i = 0; i < rows.length; i++) {
+      html += "<tr><td class='k'>" + rows[i][0] + "</td><td class='v'>" + rows[i][1] + "</td></tr>";
+    }
+    return html;
+  }
+
+  function buildBits(r) {
+    // Render the network address bits; first `prefix` bits are network bits.
+    var html = "";
+    for (var oct = 0; oct < 4; oct++) {
+      html += "<span class='bit-octet'>";
+      for (var b = 0; b < 8; b++) {
+        var idx = oct * 8 + b;                 // 0 = MSB
+        var bitVal = (r.network >>> (31 - idx)) & 1;
+        var cls = idx < r.prefix ? "bit net" : "bit host";
+        html += "<span class='" + cls + "'>" + bitVal + "</span>";
+      }
+      html += "</span>";
+      if (oct < 3) html += "<span class='bit-dot'>.</span>";
+    }
+    return html;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  // ---- DOM ---------------------------------------------------------------
+  var input = document.getElementById("cidr");
+  var statusEl = document.getElementById("status");
+  var summaryEl = document.getElementById("summary");
+  var errorBox = document.getElementById("errorBox");
+  var fieldsTable = document.getElementById("fieldsTable");
+  var fieldsBody = document.getElementById("fieldsBody");
+  var copyBar = document.getElementById("copyBar");
+  var bitsEl = document.getElementById("bits");
+  var lastResult = null;
+
+  function render() {
+    var raw = input.value;
+    writeHash(raw);
+    var parsed, r;
+    try {
+      parsed = parseCidr(raw);
+      r = compute(parsed);
+    } catch (err) {
+      lastResult = null;
+      input.classList.add("invalid");
+      statusEl.className = "status over";
+      statusEl.textContent = "invalid";
+      summaryEl.innerHTML = "";
+      errorBox.hidden = false;
+      errorBox.innerHTML = '<div class="error-detail">' + escapeHtml(err.message) + "</div>";
+      fieldsTable.hidden = true;
+      fieldsBody.innerHTML = "";
+      copyBar.hidden = true;
+      bitsEl.innerHTML = "";
+      return;
+    }
+    lastResult = r;
+    input.classList.remove("invalid");
+    statusEl.className = "status ok";
+    statusEl.textContent = "valid";
+    errorBox.hidden = true;
+    errorBox.innerHTML = "";
+    summaryEl.innerHTML = describe(r);
+    fieldsTable.hidden = false;
+    fieldsBody.innerHTML = buildFields(r);
+    copyBar.hidden = false;
+    bitsEl.innerHTML = buildBits(r);
+  }
+
+  function copyValue(kind) {
+    if (!lastResult) return;
+    var r = lastResult, text;
+    if (kind === "network") text = dotted(r.network) + "/" + r.prefix;
+    else if (kind === "mask") text = dotted(r.mask);
+    else if (kind === "range") {
+      if (r.prefix >= 32) text = dotted(r.network);
+      else text = dotted(r.firstHost) + " - " + dotted(r.lastHost);
+    } else return;
+    var btn = copyBar.querySelector('button[data-copy="' + kind + '"]');
+    function ok() {
+      if (!btn) return;
+      var prev = btn.textContent;
+      btn.textContent = "copied";
+      setTimeout(function () { btn.textContent = prev; }, 1100);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(ok, function () { fallbackCopy(text, ok); });
+    } else {
+      fallbackCopy(text, ok);
+    }
+  }
+
+  function fallbackCopy(text, done) {
+    try {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "absolute";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      done();
+    } catch (_) { /* clipboard unavailable; no-op */ }
+  }
+
+  copyBar.addEventListener("click", function (ev) {
+    var btn = ev.target.closest("button[data-copy]");
+    if (!btn) return;
+    copyValue(btn.dataset.copy);
+  });
+
+  // ---- prefix reference table -------------------------------------------
+  (function buildRef() {
+    var refBody = document.getElementById("refBody");
+    var rowsFor = [8, 16, 22, 24, 25, 26, 27, 28, 29, 30, 31, 32];
+    var html = "";
+    for (var i = 0; i < rowsFor.length; i++) {
+      var p = rowsFor[i];
+      var total = Math.pow(2, 32 - p);
+      var usable = p === 32 ? 1 : (p === 31 ? 2 : total - 2);
+      html += "<tr><td>/" + p + "</td><td>" + dotted(maskForPrefix(p)) + "</td><td>" +
+        groupThousands(total) + " / " + groupThousands(usable) + "</td></tr>";
+    }
+    refBody.innerHTML = html;
+  })();
+
+  // ---- URL hash state ----------------------------------------------------
+  function writeHash(cidr) {
+    var hash = "#cidr=" + encodeURIComponent(cidr);
+    if (location.hash !== hash) {
+      history.replaceState(null, "", location.pathname + hash);
+    }
+  }
+  function readHash() {
+    var h = location.hash;
+    if (!h || h.length < 2) return null;
+    var params = new URLSearchParams(h.slice(1));
+    return params.get("cidr");
+  }
+
+  var initial = readHash();
+  if (initial !== null) input.value = initial;
+
+  input.addEventListener("input", render);
+
+  document.getElementById("presets").addEventListener("click", function (ev) {
+    var btn = ev.target.closest("button[data-cidr]");
+    if (!btn) return;
+    input.value = btn.dataset.cidr;
+    input.focus();
+    render();
+  });
+
+  render();
+})();
+</script>
+
+</body>
+</html>
