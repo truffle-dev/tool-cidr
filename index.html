@@ -724,6 +724,16 @@ footer.colophon a:hover { color: var(--accent); border-bottom-color: var(--accen
 
   input.addEventListener("input", render);
 
+  // Keep the field in sync when the fragment changes without a reload
+  // (browser back/forward, or a pasted deep link on the open page).
+  window.addEventListener("hashchange", function () {
+    var fromHash = readHash();
+    if (fromHash !== null && fromHash !== input.value) {
+      input.value = fromHash;
+      render();
+    }
+  });
+
   document.getElementById("presets").addEventListener("click", function (ev) {
     var btn = ev.target.closest("button[data-cidr]");
     if (!btn) return;
